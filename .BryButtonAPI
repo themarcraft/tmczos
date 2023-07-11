@@ -1,0 +1,117 @@
+--bryceio's Computercraft Button API v1.0
+--This API is free for anyone to use, but if you use this for any form of content creation, please credit me.
+--I am bryceio on most social medias (except twitter @bryceio_), so that will do. 
+--If you have any suggestions for improving this API please let me know.
+ 
+--This is the function that creates a new button to be used by the further functions.
+--This function returns a list with keys. You can freely edit or read these keys once created, but this is just a simple constructor for the buttons.
+--The inputs should be the following: 
+--xPos: an integer representing the x posisiton of the button's top left corner.
+--yPos: an integer representing the x posistion of the button's bottm left corner.
+--label: a string that will be the text on the button.
+--defaultColor: the integer value of the color the button will be while inactive. I recommend using the computercraft colors api for getting a number.
+--pressedColor: the integer value of the color the button will be while active. Again, you may want to use the colors api.
+--toggleable: a boolean that determines if pressing the button should activate and then deactivate the button or should switch between active and inactive with each click.
+--runFucntion: a function that you want the button to run when pressed. Toggleable buttons will run the function with a parameter of false when being turned on and a parameter of true when being turned off.
+function createNewButton(xPos, yPos, label, defaultColor, pressedColor, toggleable, runFunction)
+    buttonObject = {}
+    buttonObject["x"] = xPos
+    buttonObject["y"] = yPos
+    buttonObject["label"] = label
+    buttonObject["defaultColor"] = defaultColor
+    buttonObject["pressedColor"] = pressedColor
+    buttonObject["toggleable"] = toggleable
+    buttonObject["function"] = runFunction
+    buttonObject["toggled"] = false --The current state of a button between On/Off. Used for changing button color and determining toggleable button's functionality
+    return buttonObject
+end
+ 
+--This is the function that draws a list of buttons onto a given monitor.
+--This function does not return any value or give any function to the buttons, but merely displays the buttons.
+--The inputs should be the following:
+--monitor: a wrapped peripheral monitor (done by passing peripheral.wrap(monitorSide) or a variable that has been declared as such.
+--buttonList: a list containing a series of buttons constructed via the createNewButton() function.
+function drawButtons(monitor, buttonList)
+    monitor.setBackgroundColor(colors.black)
+    monitor.clear()
+    local i
+    for i = 1, #buttonList do
+        if buttonList[i]["toggled"] then 
+            monitor.setBackgroundColor(buttonList[i]["pressedColor"]) 
+        else
+            monitor.setBackgroundColor(buttonList[i]["defaultColor"])
+        end
+        local xPos = buttonList[i]["x"]
+        local yPos = buttonList[i]["y"]
+        monitor.setCursorPos(xPos, yPos)
+        for character = 1, #buttonList[i]["label"] + 2 do 
+            monitor.write(" ")
+        end
+        monitor.setCursorPos(xPos, yPos + 1)
+        monitor.write(" " .. buttonList[i]["label"] .. " ")
+        monitor.setCursorPos(xPos, yPos + 2)
+        for character = 1, #buttonList[i]["label"] + 2 do 
+            monitor.write(" ")
+        end
+    end
+end
+ 
+--This function will begin a loop that continues until one of two things happens.
+--Condition 1: A button contained within the provided button list has been clicked.
+--When this condition is met, the function checks the type and state of the button, then runs functions accordingly.
+--Condition 2: A timer of a provided length has expired.
+--When this condition is met, the function runs the function provided as the timeoutFunction parameter.
+--If you want to continually process button inputs, I suggest puttng this function within a while loop.
+--The inputs should be the following:
+--monitor: the monitor that the buttons are being displayed on.
+--buttonList: the a list of the buttons to check.
+--timeoutLength: the length in seconds of the timeout timer. Can have a precision of 0.05 seconds.
+--timeoutFunction: the function to run when the timeout timer expires.
+function  checkButtonsPressed(monitor, buttonList, timeoutLength, timeoutFunction)
+    local pressedCheck = false
+    if timeoutLength > 0 then 
+        local timeoutTimer = os.startTimer(timeoutLength)
+    end
+    while true do
+        local event, par1, par2, par3 = os.pullEvent()
+        if event == "timer" then
+            if par1 == timeoutTimer then
+                timeoutFunction()
+                break
+            end
+        elseif event == "monitor_touch" then
+            local i
+            for i = 1, #buttonList do
+                if par2 >= buttonList[i]["x"] and par2 <= buttonList[i]["x"] + #buttonList[i]["label"] + 2 and par3 >= buttonList[i]["y"] and par3 <= buttonList[i]["y"] + 2 then
+                    if buttonList[i]["toggleable"] then
+                        if buttonList[i]["toggled"] then
+                            buttonList[i]["toggled"] = false
+                            drawButtons(monitor, buttonList)
+                            buttonList[i]["function"](true)
+                            pressedCheck = true
+                            break
+                        else
+                            buttonList[i]["toggled"] = true
+                            drawButtons(monitor, buttonList)
+                            buttonList[i]["function"](false)
+                            pressedCheck = true
+                            break
+                        end
+                    else
+                        buttonList[i]["toggled"] = true
+                        drawButtons(monitor, buttonList)
+                        sleep(0.25)
+                        buttonList[i]["function"]()
+                        buttonList[i]["toggled"] = false
+                        drawButtons(monitor, buttonList)
+                        pressedCheck = true
+                        break
+                    end
+                end
+            end
+            if pressedCheck then
+                break
+            end
+        end
+    end
+end
